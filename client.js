@@ -52,6 +52,14 @@ window.__ModuleLoader__.load({
       'translating': '翻译中…',
       'translateFailed': '翻译失败',
       'translateRetry': '重试翻译',
+      'translateTitle': '点击翻译并展开中文',
+      'unreadOnly': '只看未读',
+      'markAllRead': '全部已读',
+      'unreadCount': '{n} 条未读',
+      'sourcesFailed': '{n} 个源异常',
+      'sourceError': '加载失败',
+      'noMatch': '没有匹配的资讯',
+      'noMatchHint': '换个关键词，或清除筛选条件试试',
       'updatedNow': '刚刚更新',
       'updatedAgo': '更新于 {n}',
       'loadError': '资讯加载失败',
@@ -126,6 +134,14 @@ window.__ModuleLoader__.load({
       'translating': 'Translating…',
       'translateFailed': 'Translation failed',
       'translateRetry': 'Retry translation',
+      'translateTitle': 'Translate and show Chinese',
+      'unreadOnly': 'Unread only',
+      'markAllRead': 'Mark all read',
+      'unreadCount': '{n} unread',
+      'sourcesFailed': '{n} sources failing',
+      'sourceError': 'failed',
+      'noMatch': 'No matching items',
+      'noMatchHint': 'Try another keyword, or clear the filters',
       'updatedNow': 'Updated just now',
       'updatedAgo': 'Updated {n}',
       'loadError': 'Could not load the feed',
@@ -227,6 +243,29 @@ window.__ModuleLoader__.load({
       return payload;
     }
 
+    /* --------------------------- read-state persistence -------------------------- */
+
+    const READ_STORE_KEY = 'dsh.techpulse.read.v1';
+    const READ_STORE_CAP = 800;
+
+    function loadReadIds() {
+      try {
+        const parsed = JSON.parse(window.localStorage.getItem(READ_STORE_KEY) ?? '[]');
+        return new Set(Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : []);
+      } catch {
+        return new Set();
+      }
+    }
+
+    function saveReadIds(set) {
+      try {
+        const ids = [...set];
+        window.localStorage.setItem(READ_STORE_KEY, JSON.stringify(ids.slice(-READ_STORE_CAP)));
+      } catch {
+        /* storage unavailable (private mode) — read state just won't persist */
+      }
+    }
+
     /* --------------------------------- pieces ---------------------------------- */
 
     function TechPulsePanelIcon({ size = 20 }) {
@@ -258,7 +297,7 @@ window.__ModuleLoader__.load({
       const phase = translation?.phase ?? 'idle';
       const label = phase === 'loading' ? t('translating') : phase === 'error' ? t('translate') : t('translate');
       return h('button', {
-        type: 'button', className: 'tp-btn tp-translate', 'aria-label': label,
+        type: 'button', className: 'tp-btn tp-translate', 'aria-label': label, title: t('translateTitle'),
         'data-phase': phase, 'data-open': (translation?.open ?? false) && phase === 'ready' ? 'true' : 'false',
         onClick: () => { onTranslate(item); },
       }, phase === 'loading' ? h('span', { className: 'tp-spin', 'aria-hidden': true }, '◌') : t('translate'));
@@ -271,12 +310,13 @@ window.__ModuleLoader__.load({
         translation.summaryZh !== '' && h('p', { className: 'tp-translation-sum' }, translation.summaryZh));
     }
 
-    function ItemCard({ item, t, now, translations, onTranslate }) {
+    function ItemCard({ item, t, now, translations, onTranslate, read, onOpen }) {
       const time = relTime(item.time, now, t);
       const translation = translations[item.id];
       const title = h('a', {
         className: 'tp-card-title', href: item.url, target: '_blank', rel: 'noopener noreferrer',
         id: `tp-card-${item.id}`,
+        onClick: () => { onOpen(item); },
       }, item.title);
 
       if (item.kind === 'event') {
@@ -286,13 +326,13 @@ window.__ModuleLoader__.load({
           : item.eventType === 'release'
             ? t(verbKey, { tag: item.eventTag || 'v?' })
             : t(verbKey);
-        return h('article', { className: 'tp-card tp-card-event' },
+        return h('article', { className: 'tp-card tp-card-event', 'data-read': read ? 'true' : 'false' },
           h('div', { className: 'tp-card-head' },
             h(SourceAvatar, { label: item.actorLogin || item.sourceLabel, url: item.avatarUrl }),
             h('span', { className: 'tp-event-line' },
               h('b', { className: 'tp-event-actor' }, item.actorLogin || item.sourceLabel),
               ' ', verb, ' ',
-              h('a', { className: 'tp-event-repo', href: item.repoUrl, target: '_blank', rel: 'noopener noreferrer' }, item.repo)),
+              h('a', { className: 'tp-event-repo', href: item.repoUrl, target: '_blank', rel: 'noopener noreferrer', onClick: () => { onOpen(item); } }, item.repo)),
             h('span', { className: 'tp-head-actions' },
               h(TranslateButton, { item, t, translation, onTranslate }),
               time !== '' && h(Meta, null, time))),
@@ -302,7 +342,7 @@ window.__ModuleLoader__.load({
       }
 
       if (item.kind === 'story') {
-        return h('article', { className: 'tp-card' },
+        return h('article', { className: 'tp-card', 'data-read': read ? 'true' : 'false' },
           h('div', { className: 'tp-card-head' },
             h(SourceAvatar, { label: item.sourceLabel }),
             h('span', { className: 'tp-source' }, item.sourceLabel),
@@ -321,7 +361,7 @@ window.__ModuleLoader__.load({
       }
 
       if (item.kind === 'repo') {
-        return h('article', { className: 'tp-card' },
+        return h('article', { className: 'tp-card', 'data-read': read ? 'true' : 'false' },
           h('div', { className: 'tp-card-head' },
             h(SourceAvatar, { label: item.sourceLabel }),
             h('span', { className: 'tp-source' }, item.sourceLabel),
@@ -337,7 +377,7 @@ window.__ModuleLoader__.load({
             item.repoLanguage !== '' && h(Meta, null, item.repoLanguage)));
       }
 
-      return h('article', { className: 'tp-card' },
+      return h('article', { className: 'tp-card', 'data-read': read ? 'true' : 'false' },
         h('div', { className: 'tp-card-head' },
           h(SourceAvatar, { label: item.sourceLabel }),
           h('span', { className: 'tp-source' }, item.sourceLabel),
@@ -359,8 +399,7 @@ window.__ModuleLoader__.load({
     }
 
     function Manager({ sources, onClose, onSaved, t }) {
-      const [draft, setDraft] = useState(() => sources.map((source) => ({ ...source })));
-      const [type, setType] = useState('rss');
+      const [draft, setDraft] = useState(() => sources.map((source) => ({ ...source })));      const [type, setType] = useState('rss');
       const [label, setLabel] = useState('');
       const [url, setUrl] = useState('');
       const [login, setLogin] = useState('');
@@ -408,15 +447,21 @@ window.__ModuleLoader__.load({
           h('span', { className: 'tp-manager-title' }, t('sourcesTitle')),
           h('button', { type: 'button', className: 'tp-btn tp-btn-icon', 'aria-label': t('cancel'), onClick: onClose }, '✕')),
         h('div', { className: 'tp-manager-scroll' },
-          h('ul', { className: 'tp-mgr-list' }, draft.map((source) =>
-            h('li', { key: source.id, className: 'tp-mgr-row' },
+          h('ul', { className: 'tp-mgr-list' }, draft.map((source) => {
+            const live = sources.find((row) => row.id === source.id);
+            const health = source.enabled ? (live?.state ?? 'unknown') : 'disabled';
+            return h('li', { key: source.id, className: 'tp-mgr-row' },
               h(SourceAvatar, { label: source.label }),
               h('div', { className: 'tp-mgr-info' },
-                h('span', { className: 'tp-mgr-label' }, source.label),
+                h('span', { className: 'tp-mgr-label' },
+                  h('span', { className: 'tp-src-dot', 'data-state': health, title: health === 'error' ? `${t('sourceError')}: ${live?.message ?? ''}` : health } ),
+                  source.label),
                 h('span', { className: 'tp-mgr-sub' },
-                  t(`type.${source.type}`), ' · ', t(`tab.${source.category}`))),
+                  t(`type.${source.type}`), ' · ', t(`tab.${source.category}`),
+                  health === 'error' && live?.message ? ` · ${String(live.message).slice(0, 60)}` : '')),
               h('button', { type: 'button', className: 'tp-btn tp-btn-icon tp-mgr-remove', 'aria-label': t('remove'), onClick: () => { remove(source.id); } }, '✕'),
-              h(Toggle, { checked: source.enabled, label: source.label, onChange: (value) => { patch(source.id, { enabled: value }); } })))),
+              h(Toggle, { checked: source.enabled, label: source.label, onChange: (value) => { patch(source.id, { enabled: value }); } }));
+          })),
           h('div', { className: 'tp-mgr-form' },
             h('div', { className: 'tp-form-title' }, t('addTitle')),
             h('label', { className: 'tp-field' },
@@ -514,8 +559,30 @@ window.__ModuleLoader__.load({
       /** { phase: 'idle'|'loading'|'ready'|'error', data, message } */
       const [digest, setDigest] = useState({ phase: 'idle', data: null, message: '' });
       const [highlightsOnly, setHighlightsOnly] = useState(false);
+      /** Item ids the user has opened; persisted locally on this browser only. */
+      const [readIds, setReadIds] = useState(() => loadReadIds());
+      const [unreadOnly, setUnreadOnly] = useState(false);
       const alive = useRef(true);
       const loadSeq = useRef(0);
+
+      const markRead = useCallback((item) => {
+        setReadIds((current) => {
+          if (current.has(item.id)) return current;
+          const next = new Set(current);
+          next.add(item.id);
+          saveReadIds(next);
+          return next;
+        });
+      }, []);
+
+      const markAllRead = useCallback(() => {
+        setReadIds((current) => {
+          const next = new Set(current);
+          for (const item of state.items) next.add(item.id);
+          saveReadIds(next);
+          return next;
+        });
+      }, [state.items]);
 
       const load = useCallback(async (force) => {
         const seq = ++loadSeq.current;
@@ -632,16 +699,27 @@ window.__ModuleLoader__.load({
 
       const highlightIds = useMemo(() => new Set(digest.data?.highlights?.map((row) => row.id) ?? []), [digest.data]);
 
+      const unreadCount = useMemo(
+        () => state.items.reduce((sum, item) => (readIds.has(item.id) ? sum : sum + 1), 0),
+        [state.items, readIds],
+      );
+
+      const failedSources = useMemo(
+        () => state.sources.filter((source) => source.enabled && source.state === 'error'),
+        [state.sources],
+      );
+
       const visible = useMemo(() => {
         const needle = query.trim().toLowerCase();
         return state.items.filter((item) => {
           if (tab !== 'all' && item.category !== tab) return false;
           if (highlightsOnly && digest.phase === 'ready' && !highlightIds.has(item.id)) return false;
+          if (unreadOnly && readIds.has(item.id)) return false;
           if (needle === '') return true;
           const haystack = `${item.title}\n${item.summary ?? ''}\n${item.sourceLabel ?? ''}\n${item.repo ?? ''}\n${item.actorLogin ?? ''}`;
           return haystack.toLowerCase().includes(needle);
         });
-      }, [state.items, tab, query, highlightsOnly, digest.phase, highlightIds]);
+      }, [state.items, tab, query, highlightsOnly, digest.phase, highlightIds, unreadOnly, readIds]);
 
       const updatedText = state.updatedAt === 0
         ? ''
@@ -658,6 +736,10 @@ window.__ModuleLoader__.load({
                 h('span', { className: 'tp-live-dot' }), t('live'))),
             h('span', { className: 'tp-actions' },
               updatedText !== '' && h('span', { className: 'tp-pill' }, updatedText),
+              failedSources.length > 0 && h('button', {
+                type: 'button', className: 'tp-pill tp-warn-pill', onClick: () => { setManaging(true); },
+                title: failedSources.map((source) => `${source.label}: ${source.message}`).join('\n'),
+              }, `⚠ ${t('sourcesFailed', { n: String(failedSources.length) })}`),
               h('button', {
                 type: 'button', className: 'tp-btn tp-btn-icon tp-btn-lg', 'aria-label': t('refresh'),
                 onClick: () => { load(true); },
@@ -676,10 +758,19 @@ window.__ModuleLoader__.load({
                 'aria-selected': tab === value, 'data-active': tab === value ? 'true' : 'false',
                 onClick: () => { setTab(value); },
               }, t(`tab.${value}`), h('span', { className: 'tp-tab-count' }, String(counts[value] ?? 0)))),
-            h('input', {
-              className: 'tp-input tp-search', type: 'search', value: query, placeholder: t('search'),
-              'aria-label': t('search'),
-              onChange: (event) => { setQuery(event.currentTarget.value); } })))),
+            h('span', { className: 'tp-toolbar-actions' },
+              unreadCount > 0 && h('button', {
+                type: 'button', className: 'tp-btn tp-chip', 'aria-pressed': unreadOnly,
+                'data-on': unreadOnly ? 'true' : 'false', onClick: () => { setUnreadOnly((value) => !value); },
+              }, `${t('unreadOnly')} · ${String(unreadCount)}`),
+              unreadCount > 0 && h('button', {
+                type: 'button', className: 'tp-btn tp-btn-icon', 'aria-label': t('markAllRead'),
+                title: t('markAllRead'), onClick: markAllRead,
+              }, '✓'),
+              h('input', {
+                className: 'tp-input tp-search', type: 'search', value: query, placeholder: t('search'),
+                'aria-label': t('search'),
+                onChange: (event) => { setQuery(event.currentTarget.value); } }))))),
         h('div', { className: 'tp-body' },
           digest.phase === 'ready' && digest.data !== null && h(DigestPanel, {
             digest: digest.data, t, now, items: state.items,
@@ -702,10 +793,13 @@ window.__ModuleLoader__.load({
             state.message !== '' && h('div', { className: 'tp-state-sub' }, state.message),
             h('button', { type: 'button', className: 'tp-btn tp-btn-secondary', onClick: () => { load(true); } }, t('retry'))),
           state.phase === 'ready' && visible.length === 0 && h('div', { className: 'tp-state' },
-            h('div', { className: 'tp-state-title' }, t('empty')),
-            h('div', { className: 'tp-state-sub' }, t('emptyHint'))),
+            h('div', { className: 'tp-state-title' }, query.trim() !== '' || highlightsOnly || unreadOnly ? t('noMatch') : t('empty')),
+            h('div', { className: 'tp-state-sub' }, query.trim() !== '' || highlightsOnly || unreadOnly ? t('noMatchHint') : t('emptyHint'))),
           state.phase === 'ready' && visible.length > 0 && h('div', { className: 'tp-list' },
-            visible.map((item) => h(ItemCard, { key: item.id, item, t, now, translations, onTranslate: translate }))),
+            visible.map((item) => h(ItemCard, {
+              key: item.id, item, t, now, translations, onTranslate: translate,
+              read: readIds.has(item.id), onOpen: markRead,
+            }))),
           managing && h(Manager, {
             sources: state.sources.length > 0 ? state.sources : [],
             t,
@@ -799,6 +893,16 @@ window.__ModuleLoader__.load({
 .tp-switch[data-on="true"]{background:var(--dsw-alias-brand-primary,#2e6be6);border-color:var(--dsw-alias-brand-primary,#2e6be6)}
 .tp-switch[data-on="true"] .tp-switch-knob{transform:translateX(15px);background:#fff}
 .tp-refresh{font-size:15px;line-height:1}
+.tp-toolbar-actions{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tp-warn-pill{cursor:pointer;border-radius:999px;padding:2px 9px;color:var(--dsw-alias-state-warn-primary,#b45309);background:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#b45309) 12%,transparent);border:none;font-weight:600}
+.tp-warn-pill:hover{background:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#b45309) 20%,transparent)}
+.tp-card[data-read="true"]{opacity:.62}
+.tp-card[data-read="true"] .tp-card-title{color:var(--dsw-alias-label-secondary,#6b7280)}
+.tp-card[data-read="true"]:hover{opacity:1}
+.tp-src-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--dsw-alias-state-idle-primary,#9ca3af)}
+.tp-src-dot[data-state="ok"]{background:var(--dsw-alias-state-success-primary,#12805c)}
+.tp-src-dot[data-state="error"]{background:var(--dsw-alias-state-error-primary,#d43d17)}
+.tp-src-dot[data-state="disabled"]{background:var(--dsw-alias-state-idle-primary,#9ca3af)}
 .tp-head-actions{margin-left:auto;display:inline-flex;align-items:center;gap:8px;flex:none}
 .tp-translate{padding:1px 7px;font-size:10.5px;font-weight:700;border-radius:999px;line-height:1.5}
 .tp-translate[data-phase="ready"][data-open="true"]{background:color-mix(in srgb,var(--dsw-alias-brand-primary,#2e6be6) 12%,transparent);border-color:var(--dsw-alias-brand-primary,#2e6be6);color:var(--dsw-alias-brand-primary,#2e6be6)}
