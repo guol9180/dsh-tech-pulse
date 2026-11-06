@@ -142,6 +142,13 @@ node test/smoke.mjs     # 覆盖：RSS/官网页解析、中文检测、模型 J
 ```
 
 3. 提交索引并推送——已添加本索引的用户会在 Discover 里看到新版本（更新 = 卸载后重装）
+4. **刷新 jsDelivr 缓存**（`@main` 的索引文件 CDN 缓存最长 12 小时，push 后执行一次立即生效）：
+
+```
+https://purge.jsdelivr.net/gh/guol9180/dsh-tech-pulse@main/market-index.json
+```
+
+（浏览器直接打开这个 purge 地址即可；dsh 市场服务自身另有 ≤10 分钟索引缓存，会自动过期）
 
 ## 安全与隐私
 
