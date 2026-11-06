@@ -41,8 +41,10 @@
 本仓库自带市场索引 `market-index.json`。在你的 dsh 插件市场里添加索引源（GUI：Plugins 页 → Discover 标签 → 添加索引；或设置里的 plugin-market 索引配置）：
 
 ```
-https://raw.githubusercontent.com/guol9180/dsh-tech-pulse/main/market-index.json
+https://cdn.jsdelivr.net/gh/guol9180/dsh-tech-pulse@main/market-index.json
 ```
+
+（备用直链：`https://raw.githubusercontent.com/guol9180/dsh-tech-pulse/main/market-index.json`）
 
 之后「科技脉搏」会出现在 Discover 列表中，点击即可安装；详情页会展示本 README。
 
