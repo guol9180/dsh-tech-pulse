@@ -1,3 +1,8 @@
+# Secrets — never commit npm tokens
+.npmrc
+.npm-token.txt
+npm-diagnose.mjs
+
 # Dependencies / build artifacts
 node_modules/
 dist/
