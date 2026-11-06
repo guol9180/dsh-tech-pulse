@@ -8,7 +8,7 @@
  * module table and no other harness package is imported.
  */
 window.__ModuleLoader__.load({
-  id: '@local/tech-pulse',
+  id: 'dsh-tech-pulse',
   factory(require) {
     const React = require('react');
     const { useState, useEffect, useMemo, useRef, useCallback } = React;

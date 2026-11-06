@@ -34,17 +34,35 @@
 
 ## 安装
 
-前提：已安装 DeepSeek Harness（dsh）并使用其 profile。
+前提：已安装 DeepSeek Harness（dsh）并使用其 profile。三种方式任选：
+
+**方式一：插件市场索引（推荐，可发现、可一键安装）**
+
+本仓库自带市场索引 `market-index.json`。在你的 dsh 插件市场里添加索引源（GUI：Plugins 页 → Discover 标签 → 添加索引；或设置里的 plugin-market 索引配置）：
+
+```
+https://raw.githubusercontent.com/guol9180/dsh-tech-pulse/main/market-index.json
+```
+
+之后「科技脉搏」会出现在 Discover 列表中，点击即可安装；详情页会展示本 README。
+
+**方式二：直接让 AI 从 GitHub 安装**
+
+在你的 DeepSeek Harness 会话里说：
+
+> 安装 bundle：git+https://github.com/guol9180/dsh-tech-pulse.git
+
+Harness 会通过 `plugin_manager install_bundle` 从 Git 拉取并安装。
+
+**方式三：克隆后按本地路径安装**
 
 ```bash
 git clone https://github.com/guol9180/dsh-tech-pulse.git
 ```
 
-然后在 DeepSeek Harness 会话里对 AI 说：
+然后对 AI 说「安装本地 bundle：<克隆路径>/dsh-tech-pulse」，或通过 GUI 的 Plugins 页面安装本地目录。
 
-> 安装本地 bundle：<克隆路径>/dsh-tech-pulse
-
-或通过 GUI 的 Plugins 页面安装本地目录。安装完成后刷新页面，侧栏会出现「科技脉搏」图标。
+安装完成后刷新页面，侧栏会出现「科技脉搏」图标。
 
 ## 使用
 
@@ -58,7 +76,7 @@ git clone https://github.com/guol9180/dsh-tech-pulse.git
 
 ```yaml
 - id: tech-pulse
-  name: '@local/tech-pulse'
+  name: 'dsh-tech-pulse'
   config:
     refreshMinutes: 15        # 每源缓存 TTL（分钟），也是面板自动刷新周期
     maxItemsPerSource: 15     # 每源最多保留条数（1–50）
