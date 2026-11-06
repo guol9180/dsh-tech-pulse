@@ -1,0 +1,64 @@
+{
+  "format": 1,
+  "title": {
+    "en": "heguoliang's dsh plugins",
+    "zh": "heguoliang 的 dsh 插件"
+  },
+  "description": {
+    "en": "Personal plugin market index for DeepSeek Harness bundles published from github.com/guol9180.",
+    "zh": "个人 DeepSeek Harness 插件市场索引，发布于 github.com/guol9180。"
+  },
+  "metadata": {
+    "categories": {
+      "news": {
+        "title": { "en": "News & information", "zh": "资讯阅读" }
+      }
+    },
+    "labels": {
+      "ai": {
+        "title": { "en": "AI assisted", "zh": "AI 增强" }
+      },
+      "chinese": {
+        "title": { "en": "Chinese UI", "zh": "中文界面" }
+      },
+      "firsthand": {
+        "title": { "en": "First-hand sources", "zh": "一手来源" }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-tech-pulse",
+      "title": {
+        "en": "Tech pulse",
+        "zh": "科技脉搏"
+      },
+      "description": {
+        "en": "Sidebar panel aggregating first-hand tech updates — Hacker News, publisher RSS, AI-lab announcements (OpenAI, Anthropic, DeepSeek, Microsoft Research), and GitHub activity from tech leaders — with an AI digest, highlight filtering, and on-demand Chinese translation.",
+        "zh": "聚合一手科技资讯的侧栏面板：Hacker News、媒体官方 RSS、头部 AI 公司动态（OpenAI/Anthropic/DeepSeek/微软研究院）、科技大佬 GitHub 动态；内置 AI 速览与重点过滤、按需中文翻译。"
+      },
+      "icon": "icon.svg",
+      "author": "heguoliang",
+      "homepage": "https://github.com/guol9180/dsh-tech-pulse",
+      "repository": {
+        "url": "https://github.com/guol9180/dsh-tech-pulse"
+      },
+      "metadata": {
+        "category": "news",
+        "keywords": ["tech-news", "hacker-news", "rss", "github", "ai-news", "translation", "科技资讯"],
+        "labels": ["ai", "chinese", "firsthand"]
+      },
+      "versions": [
+        {
+          "version": "1.1.0",
+          "publishTimestamp": 1794035460,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/guol9180/dsh-tech-pulse",
+            "commit": "4e19286b759965bca1701b024448c02a518ac7bf"
+          }
+        }
+      ]
+    }
+  ]
+}

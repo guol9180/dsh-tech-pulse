@@ -126,6 +126,21 @@ node test/smoke.mjs     # 覆盖：RSS/官网页解析、中文检测、模型 J
 
 > 对 Harness AI 说：重装本地 bundle `<本仓库路径>`
 
+## 发布新版本
+
+1. 改代码 → `package.json` 升版本号 → 提交并推送
+2. 取该提交的完整 SHA（`git rev-parse HEAD`），在 `market-index.json` 的 `versions` 数组**头部**插入一条：
+
+```json
+{
+  "version": "x.y.z",
+  "publishTimestamp": <Unix 秒>,
+  "source": { "type": "git", "url": "https://github.com/guol9180/dsh-tech-pulse", "commit": "<40 位 SHA>" }
+}
+```
+
+3. 提交索引并推送——已添加本索引的用户会在 Discover 里看到新版本（更新 = 卸载后重装）
+
 ## 面板与 Host 的接口
 
 - `GET tech-pulse/feed?refresh=1&category=flash|news|ai|voices` — 聚合条目（含 `needZh` 标记）与各源状态
