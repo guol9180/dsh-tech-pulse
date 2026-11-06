@@ -50,6 +50,15 @@
       },
       "versions": [
         {
+          "version": "1.2.0",
+          "publishTimestamp": 1794085800,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/guol9180/dsh-tech-pulse",
+            "commit": "22b5f0d170e25345698d37d2a9b32504038b483d"
+          }
+        },
+        {
           "version": "1.1.0",
           "publishTimestamp": 1794035460,
           "source": {
