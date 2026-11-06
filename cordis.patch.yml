@@ -1,0 +1,3 @@
+- insert:
+    - id: tech-pulse
+      name: '@local/tech-pulse'
