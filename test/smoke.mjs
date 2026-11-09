@@ -1,12 +1,32 @@
 import { __internals } from '../index.js';
 
-const { Aggregator, normalizeConfig, normalizePostedSources, needsChinese, parseModelJson, parseAnthropicNews, parseDeepseekNews } = __internals;
+const { Aggregator, normalizeConfig, normalizePostedSources, needsChinese, parseModelJson, parseAnthropicNews, parseDeepseekNews, clusterTitles, extractArticleText } = __internals;
 
 // 1) Pure units.
 if (needsChinese('更高能效比，带来新惊喜：M6 款 MacBook Pro 初探') !== true) throw new Error('needsChinese zh failed');
 if (needsChinese('Nvidia Kubernetes Engine launches') !== false) throw new Error('needsChinese en failed');
 if (parseModelJson('```json\n{"digest":["a"],"highlights":[]}\n```')?.digest?.[0] !== 'a') throw new Error('parseModelJson fence failed');
 if (parseModelJson('result: {"title":"t","summary":"s"}')?.title !== 't') throw new Error('parseModelJson prose failed');
+
+// 1b) Cluster counting: cross-source reports of one story share a count.
+const clustered = clusterTitles([
+  { title: 'Nvidia launches Kubernetes Engine for AI factories' },
+  { title: 'Nvidia Kubernetes Engine launches for AI factories' },
+  { title: 'DeepSeek 发布新模型 DeepSeek-V4.2' },
+  { title: 'DeepSeek 发布了新模型 DeepSeek-V4.2' },
+  { title: 'Solidot 报道了一个完全不相关的存储事件' },
+]);
+if (clustered[0].clusterCount !== 2 || clustered[1].clusterCount !== 2) throw new Error('latin clustering failed');
+if (clustered[2].clusterCount !== 2 || clustered[3].clusterCount !== 2) throw new Error('cjk clustering failed');
+if (clustered[4].clusterCount !== 1) throw new Error('unrelated item wrongly clustered');
+console.log('[cluster] OK');
+
+// 1c) Article text extraction: p-dense container wins over nav junk.
+const page = `<body><nav><p>Menu item one Menu item two Menu item three Menu item four</p></nav>
+<div class="content"><p>${'Real article paragraph with substantial content. '.repeat(12)}</p><p>${'Second paragraph of the actual story continues here. '.repeat(10)}</p></div></body>`;
+const text = extractArticleText(page);
+if (!text.startsWith('Real article paragraph') || text.includes('Menu item')) throw new Error('article extraction failed');
+console.log('[article] OK');
 
 const anthFixture = `<a class="x" href="/news/ai-for-science-expands-foundations-research-institutions"><span><h3>AI for Science expands</h3></span></a>
 <a href="/news/announcements">Announcements</a>

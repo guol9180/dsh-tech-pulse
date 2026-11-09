@@ -8,8 +8,12 @@
 
 - **全部一手来源**：官方 API / 出版方官方 RSS / 官网新闻页 / 本人博客与 GitHub 动态，不经任何聚合转手
 - **四个分类标签**：快讯 / 新闻 / AI 前沿 / 大佬动态（带计数），支持搜索过滤
-- **AI 速览**：一键把近 48 小时资讯交给模型，产出中文要点 + 重点消息（附理由，可点击定位卡片），「只看重点」一键过滤
+- **AI 速览（创作者视角）**：一键生成中文要点 + **可创作角度**（选题方向与切入钩子）+ 重点消息（附理由，可点击定位卡片），「只看重点」一键过滤
+- **跨源热度信号**：多家媒体报道同一事件时，卡片显示「🔥 N 源报道」——选题热度的直观数字
+- **收藏与导出**：星标收藏（本地保存）、收藏夹过滤、「复制素材」把当前可见条目（含翻译、热度、链接）导出为 Markdown 素材草稿，粘贴给任何 AI 即可开写
+- **读全文**：摘要条目点击「全文」，Host 抓取原文并提取正文，卡片内展开阅读
 - **按需中文翻译**：英文条目点击「译」才翻译并展开（Host 缓存，重复展开零成本），中文条目自动隐藏按钮
+- **中文热榜速查**：订阅管理预置微博热搜/知乎热榜/B站热门/抖音热点/36氪快讯的 RSSHub 路由（需本机 RSSHub，一键填充）
 - **订阅管理**：面板内增删启停订阅源，写入 profile 持久生效；也支持直接改 `cordis.patch.yml`
 - Host 进程内抓取（无 CORS 限制）、按源缓存、单源失败不影响整体、所有路由经登录鉴权信任闸
 
@@ -164,9 +168,10 @@ https://purge.jsdelivr.net/gh/guol9180/dsh-tech-pulse@main/market-index.json
 
 ## 面板与 Host 的接口
 
-- `GET tech-pulse/feed?refresh=1&category=flash|news|ai|voices` — 聚合条目（含 `needZh` 标记）与各源状态
+- `GET tech-pulse/feed?refresh=1&category=flash|news|ai|voices` — 聚合条目（含 `needZh` 标记、`clusterCount` 热度计数）与各源状态
 - `GET tech-pulse/translate?id=<itemId>` — 单条按需中文翻译（Host 缓存）
-- `GET tech-pulse/summarize?refresh=1` — AI 速览（digest + highlights，按内容指纹缓存）
+- `GET tech-pulse/article?id=<itemId>` — 单条按需原文正文提取（Host 缓存）
+- `GET tech-pulse/summarize?refresh=1` — AI 速览（digest + angles + highlights，按内容指纹缓存）
 - `GET/POST tech-pulse/sources` — 读取/整表替换订阅（严格校验，最多 64 个源）
 - 所有路由经过 `connection.requestRejection` 信任闸（Host/Origin 防护 + 登录 cookie 鉴权）；保存订阅使用 `configEditor.edit`
 

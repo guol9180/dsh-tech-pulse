@@ -20,10 +20,19 @@ window.__ModuleLoader__.load({
     const SOURCES_ROUTE = '/tech-pulse/sources'.slice(1);
     const TRANSLATE_ROUTE = '/tech-pulse/translate'.slice(1);
     const SUMMARIZE_ROUTE = '/tech-pulse/summarize'.slice(1);
+    const ARTICLE_ROUTE = '/tech-pulse/article'.slice(1);
 
     const TABS = ['all', 'flash', 'news', 'ai', 'voices'];
     const SOURCE_TYPES = ['rss', 'hackernews', 'github-user', 'html-news', 'github-trending'];
     const CATEGORIES = ['flash', 'news', 'ai', 'voices'];
+    /** One-click RSSHub routes for Chinese platform hot lists (need a local RSSHub on :1200). */
+    const RSSHUB_ROUTES = [
+      { label: '微博热搜', path: '/weibo/search/hot' },
+      { label: '知乎热榜', path: '/zhihu/hot' },
+      { label: 'B站热门', path: '/bilibili/popular/all' },
+      { label: '抖音热点', path: '/douyin/trending' },
+      { label: '36氪快讯', path: '/36kr/newsflashes' },
+    ];
 
     /* ---------------------------------- locale --------------------------------- */
 
@@ -60,6 +69,20 @@ window.__ModuleLoader__.load({
       'sourceError': '加载失败',
       'noMatch': '没有匹配的资讯',
       'noMatchHint': '换个关键词，或清除筛选条件试试',
+      'fav': '收藏',
+      'unfav': '取消收藏',
+      'favorites': '已收藏',
+      'copyMaterial': '复制素材',
+      'copied': '已复制到剪贴板',
+      'copyFailed': '复制失败，请手动复制',
+      'materialTitle': '科技脉搏素材',
+      'multiSource': '{n} 源报道',
+      'anglesTitle': '可创作角度',
+      'readFull': '全文',
+      'readFullTitle': '抓取并展开原文全文',
+      'readFullFailed': '全文获取失败',
+      'quickRoutes': '中文热榜速查',
+      'quickRoutesHint': '点击自动填充，需先启动本机 RSSHub（localhost:1200）',
       'updatedNow': '刚刚更新',
       'updatedAgo': '更新于 {n}',
       'loadError': '资讯加载失败',
@@ -142,6 +165,20 @@ window.__ModuleLoader__.load({
       'sourceError': 'failed',
       'noMatch': 'No matching items',
       'noMatchHint': 'Try another keyword, or clear the filters',
+      'fav': 'Star',
+      'unfav': 'Unstar',
+      'favorites': 'Starred',
+      'copyMaterial': 'Copy as material',
+      'copied': 'Copied to clipboard',
+      'copyFailed': 'Copy failed; copy manually',
+      'materialTitle': 'Tech pulse material',
+      'multiSource': '{n} sources',
+      'anglesTitle': 'Angles to write',
+      'readFull': 'Full text',
+      'readFullTitle': 'Fetch and show the full article',
+      'readFullFailed': 'Could not fetch the full article',
+      'quickRoutes': 'Chinese hot lists',
+      'quickRoutesHint': 'One click fills the feed URL; needs a local RSSHub on localhost:1200',
       'updatedNow': 'Updated just now',
       'updatedAgo': 'Updated {n}',
       'loadError': 'Could not load the feed',
@@ -247,23 +284,33 @@ window.__ModuleLoader__.load({
 
     const READ_STORE_KEY = 'dsh.techpulse.read.v1';
     const READ_STORE_CAP = 800;
+    const FAV_STORE_KEY = 'dsh.techpulse.fav.v1';
+    const FAV_STORE_CAP = 500;
 
-    function loadReadIds() {
+    function loadStoredIds(key) {
       try {
-        const parsed = JSON.parse(window.localStorage.getItem(READ_STORE_KEY) ?? '[]');
+        const parsed = JSON.parse(window.localStorage.getItem(key) ?? '[]');
         return new Set(Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : []);
       } catch {
         return new Set();
       }
     }
 
-    function saveReadIds(set) {
+    function saveStoredIds(key, set, cap) {
       try {
         const ids = [...set];
-        window.localStorage.setItem(READ_STORE_KEY, JSON.stringify(ids.slice(-READ_STORE_CAP)));
+        window.localStorage.setItem(key, JSON.stringify(ids.slice(-cap)));
       } catch {
-        /* storage unavailable (private mode) — read state just won't persist */
+        /* storage unavailable (private mode) — state just won't persist */
       }
+    }
+
+    function loadReadIds() {
+      return loadStoredIds(READ_STORE_KEY);
+    }
+
+    function saveReadIds(set) {
+      saveStoredIds(READ_STORE_KEY, set, READ_STORE_CAP);
     }
 
     /* --------------------------------- pieces ---------------------------------- */
@@ -292,6 +339,36 @@ window.__ModuleLoader__.load({
       return h('span', { className: 'tp-meta-item' }, children);
     }
 
+    function FullTextButton({ item, t, fullText, onFetch }) {
+      if (item.url === '' || item.url === undefined) return null;
+      const phase = fullText?.phase ?? 'idle';
+      return h('button', {
+        type: 'button', className: 'tp-btn tp-translate', 'aria-label': t('readFull'), title: t('readFull'),
+        'data-phase': phase, 'data-open': (fullText?.open ?? false) && phase === 'ready' ? 'true' : 'false',
+        onClick: () => { onFetch(item); },
+      }, phase === 'loading' ? h('span', { className: 'tp-spin', 'aria-hidden': true }, '◌') : t('readFull'));
+    }
+
+    function FullTextBlock({ item, t, fullText, onFetch }) {
+      if (fullText?.open !== true || fullText?.phase !== 'ready') return null;
+      return h('div', { className: 'tp-fulltext' },
+        h('div', { className: 'tp-fulltext-body' }, fullText.text));
+    }
+
+    function StarButton({ item, t, fav, onFav }) {
+      return h('button', {
+        type: 'button', className: 'tp-btn tp-star', 'aria-label': fav ? t('unfav') : t('fav'),
+        'data-fav': fav ? 'true' : 'false', title: fav ? t('unfav') : t('fav'),
+        onClick: () => { onFav(item); },
+      }, fav ? '★' : '☆');
+    }
+
+    function ClusterChip({ item, t }) {
+      if ((item.clusterCount ?? 1) < 2) return null;
+      const label = t('multiSource', { n: String(item.clusterCount) });
+      return h('span', { className: 'tp-cluster', title: label }, `🔥 ${label}`);
+    }
+
     function TranslateButton({ item, t, translation, onTranslate }) {
       if (item.needZh !== true) return null;
       const phase = translation?.phase ?? 'idle';
@@ -310,7 +387,7 @@ window.__ModuleLoader__.load({
         translation.summaryZh !== '' && h('p', { className: 'tp-translation-sum' }, translation.summaryZh));
     }
 
-    function ItemCard({ item, t, now, translations, onTranslate, read, onOpen }) {
+    function ItemCard({ item, t, now, translations, onTranslate, read, onOpen, fav, onFav, fullTexts, onFetchFullText }) {
       const time = relTime(item.time, now, t);
       const translation = translations[item.id];
       const title = h('a', {
@@ -334,9 +411,11 @@ window.__ModuleLoader__.load({
               ' ', verb, ' ',
               h('a', { className: 'tp-event-repo', href: item.repoUrl, target: '_blank', rel: 'noopener noreferrer', onClick: () => { onOpen(item); } }, item.repo)),
             h('span', { className: 'tp-head-actions' },
+              h(StarButton, { item, t, fav, onFav }),
               h(TranslateButton, { item, t, translation, onTranslate }),
               time !== '' && h(Meta, null, time))),
           item.eventTitle !== '' && h('div', { className: 'tp-event-title' }, item.eventTitle),
+          h(FullTextBlock, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
           translation?.phase === 'error' && h('div', { className: 'tp-inline-error' }, `${t('translateFailed')} · `, h('button', { type: 'button', className: 'tp-btn tp-btn-link', onClick: () => { onTranslate(item); } }, t('translateRetry'))),
           h(TranslationBlock, { item, t, translation, onTranslate }));
       }
@@ -352,6 +431,7 @@ window.__ModuleLoader__.load({
           title,
           item.summary !== '' && h('p', { className: 'tp-card-sum' }, item.summary),
           translation?.phase === 'error' && h('div', { className: 'tp-inline-error' }, `${t('translateFailed')} · `, h('button', { type: 'button', className: 'tp-btn tp-btn-link', onClick: () => { onTranslate(item); } }, t('translateRetry'))),
+          h(FullTextBlock, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
           h(TranslationBlock, { item, t, translation, onTranslate }),
           h('div', { className: 'tp-meta' },
             h(Meta, null, `▲ ${fmtCount(item.score ?? 0)}`),
@@ -371,6 +451,7 @@ window.__ModuleLoader__.load({
           title,
           item.summary !== '' && h('p', { className: 'tp-card-sum' }, item.summary),
           translation?.phase === 'error' && h('div', { className: 'tp-inline-error' }, `${t('translateFailed')} · `, h('button', { type: 'button', className: 'tp-btn tp-btn-link', onClick: () => { onTranslate(item); } }, t('translateRetry'))),
+          h(FullTextBlock, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
           h(TranslationBlock, { item, t, translation, onTranslate }),
           h('div', { className: 'tp-meta' },
             h(Meta, null, `★ ${fmtCount(item.stars ?? 0)}`),
@@ -380,8 +461,10 @@ window.__ModuleLoader__.load({
       return h('article', { className: 'tp-card', 'data-read': read ? 'true' : 'false' },
         h('div', { className: 'tp-card-head' },
           h(SourceAvatar, { label: item.sourceLabel }),
-          h('span', { className: 'tp-source' }, item.sourceLabel),
+          h('span', { className: 'tp-source' }, item.sourceLabel, ' ', h(ClusterChip, { item, t })),
           h('span', { className: 'tp-head-actions' },
+            h(StarButton, { item, t, fav, onFav }),
+            h(FullTextButton, { item, t, fullText, onFetchFullText }),
             h(TranslateButton, { item, t, translation, onTranslate }),
             time !== '' && h(Meta, null, time))),
         title,
@@ -486,6 +569,19 @@ window.__ModuleLoader__.load({
                 placeholder: type === 'rss' ? 'https://example.com/feed.xml' : 'https://www.anthropic.com/news · https://api-docs.deepseek.com/zh-cn/news/',
                 onChange: (event) => { setUrl(event.currentTarget.value); },
               })),
+            type === 'rss' && h('div', { className: 'tp-quick-routes' },
+              h('span', { className: 'tp-field-label' }, `${t('quickRoutes')}：`),
+              RSSHUB_ROUTES.map((route) => h('button', {
+                key: route.path, type: 'button', className: 'tp-btn tp-chip',
+                title: `http://localhost:1200${route.path}`,
+                onClick: () => {
+                  setUrl(`http://localhost:1200${route.path}`);
+                  setLabel(route.label);
+                  setCategory('flash');
+                  setFormError('');
+                },
+              }, route.label)),
+              h('span', { className: 'tp-quick-hint' }, t('quickRoutesHint'))),
             type === 'github-user' && h('label', { className: 'tp-field' },
               h('span', { className: 'tp-field-label' }, t('field.login')),
               h('input', { className: 'tp-input', value: login, placeholder: 'torvalds',
@@ -515,6 +611,11 @@ window.__ModuleLoader__.load({
           h('button', { type: 'button', className: 'tp-btn tp-btn-icon', 'aria-label': t('closeDigest'), onClick: onClose, title: t('closeDigest') }, '✕')),
         digest.digest.length > 0 && h('ul', { className: 'tp-digest-list' },
           digest.digest.map((line, index) => h('li', { key: index, className: 'tp-digest-item' }, line))),
+        Array.isArray(digest.angles) && digest.angles.length > 0 && h('div', { className: 'tp-angles' },
+          h('div', { className: 'tp-form-title' }, `✍ ${t('anglesTitle')}`),
+          digest.angles.map((row, index) => h('div', { key: index, className: 'tp-angle' },
+            h('span', { className: 'tp-angle-topic' }, row.topic),
+            row.angle !== '' && h('span', { className: 'tp-angle-hook' }, row.angle)))),
         digest.highlights.length > 0 && h('div', { className: 'tp-highlights' },
           h('div', { className: 'tp-form-title' }, t('highlightsTitle')),
           digest.highlights.map((highlight) => {
@@ -562,6 +663,12 @@ window.__ModuleLoader__.load({
       /** Item ids the user has opened; persisted locally on this browser only. */
       const [readIds, setReadIds] = useState(() => loadReadIds());
       const [unreadOnly, setUnreadOnly] = useState(false);
+      /** Starred item ids (material for writing); persisted locally. */
+      const [favIds, setFavIds] = useState(() => loadStoredIds(FAV_STORE_KEY));
+      const [favOnly, setFavOnly] = useState(false);
+      /** itemId -> { phase, open, text } for on-demand full-text reads. */
+      const [fullTexts, setFullTexts] = useState({});
+      const [copyState, setCopyState] = useState({ phase: 'idle', message: '' });
       const alive = useRef(true);
       const loadSeq = useRef(0);
 
@@ -583,6 +690,41 @@ window.__ModuleLoader__.load({
           return next;
         });
       }, [state.items]);
+
+      const toggleFav = useCallback((item) => {
+        setFavIds((current) => {
+          const next = new Set(current);
+          if (next.has(item.id)) next.delete(item.id);
+          else next.add(item.id);
+          saveStoredIds(FAV_STORE_KEY, next, FAV_STORE_CAP);
+          return next;
+        });
+      }, []);
+
+      const fetchFullText = useCallback(async (item) => {
+        setFullTexts((current) => {
+          const existing = current[item.id];
+          if (existing?.phase === 'ready') {
+            return { ...current, [item.id]: { ...existing, open: !existing.open } };
+          }
+          return { ...current, [item.id]: { phase: 'loading', open: true } };
+        });
+        if (fullTexts[item.id]?.phase === 'ready') return;
+        try {
+          const payload = await apiGet(ARTICLE_ROUTE, { id: item.id });
+          if (!alive.current) return;
+          setFullTexts((current) => ({
+            ...current,
+            [item.id]: { phase: 'ready', open: true, text: String(payload.article?.text ?? '') },
+          }));
+        } catch (error) {
+          if (!alive.current) return;
+          setFullTexts((current) => ({
+            ...current,
+            [item.id]: { phase: 'error', open: false, message: error instanceof Error ? error.message : String(error) },
+          }));
+        }
+      }, [fullTexts]);
 
       const load = useCallback(async (force) => {
         const seq = ++loadSeq.current;
@@ -661,6 +803,7 @@ window.__ModuleLoader__.load({
               itemCount: typeof payload.itemCount === 'number' ? payload.itemCount : 0,
               digest: Array.isArray(payload.digest) ? payload.digest : [],
               highlights: Array.isArray(payload.highlights) ? payload.highlights : [],
+              angles: Array.isArray(payload.angles) ? payload.angles : [],
               model: String(payload.model ?? ''),
             },
           });
@@ -715,15 +858,49 @@ window.__ModuleLoader__.load({
           if (tab !== 'all' && item.category !== tab) return false;
           if (highlightsOnly && digest.phase === 'ready' && !highlightIds.has(item.id)) return false;
           if (unreadOnly && readIds.has(item.id)) return false;
+          if (favOnly && !favIds.has(item.id)) return false;
           if (needle === '') return true;
           const haystack = `${item.title}\n${item.summary ?? ''}\n${item.sourceLabel ?? ''}\n${item.repo ?? ''}\n${item.actorLogin ?? ''}`;
           return haystack.toLowerCase().includes(needle);
         });
-      }, [state.items, tab, query, highlightsOnly, digest.phase, highlightIds, unreadOnly, readIds]);
+      }, [state.items, tab, query, highlightsOnly, digest.phase, highlightIds, unreadOnly, readIds, favOnly, favIds]);
 
       const updatedText = state.updatedAt === 0
         ? ''
         : (now - state.updatedAt < 60000 ? t('updatedNow') : t('updatedAgo', { n: relTime(state.updatedAt, now, t) }));
+
+      /** Copy the currently visible items (filters applied) as a Markdown material draft. */
+      const exportMaterial = useCallback(async () => {
+        const lines = [`# ${t('materialTitle')} · ${new Date().toLocaleString()}`, ''];
+        for (const item of visible) {
+          lines.push(`## ${item.title}`);
+          const metaBits = [item.sourceLabel];
+          if ((item.clusterCount ?? 1) > 1) metaBits.push(t('multiSource', { n: String(item.clusterCount) }));
+          metaBits.push(t(`tab.${item.category}`));
+          if (item.time > 0) metaBits.push(new Date(item.time).toLocaleString());
+          lines.push(`- ${metaBits.join('｜')}`);
+          if (item.url !== '') lines.push(`- ${item.url}`);
+          if (item.repo !== undefined && item.repo !== '') lines.push(`- ${item.repoUrl}`);
+          const zh = translations[item.id];
+          if (zh?.phase === 'ready' && zh.titleZh !== '') {
+            lines.push(`- ${zh.titleZh}${zh.summaryZh !== '' ? `——${zh.summaryZh}` : ''}`);
+          }
+          if (item.summary !== undefined && item.summary !== '') lines.push(`> ${item.summary}`);
+          lines.push('');
+        }
+        try {
+          await navigator.clipboard.writeText(lines.join('\n'));
+          setCopyState({ phase: 'ok', message: t('copied') });
+        } catch {
+          setCopyState({ phase: 'error', message: t('copyFailed') });
+        }
+      }, [visible, translations, t]);
+
+      useEffect(() => {
+        if (copyState.phase === 'idle') return;
+        const timer = setTimeout(() => { setCopyState({ phase: 'idle', message: '' }); }, 2500);
+        return () => { clearTimeout(timer); };
+      }, [copyState]);
 
       return h('div', { className: 'tp-page' },
         h('style', null, CSS),
@@ -745,6 +922,10 @@ window.__ModuleLoader__.load({
                 onClick: () => { load(true); },
               }, h('span', { className: `tp-refresh ${state.phase === 'loading' ? 'tp-spin' : ''}`, 'aria-hidden': true }, '⟳')),
               h('button', {
+                type: 'button', className: 'tp-btn tp-btn-secondary', disabled: copyState.phase === 'ok' || visible.length === 0,
+                title: t('copyMaterial'), onClick: exportMaterial,
+              }, copyState.phase === 'ok' ? `✓ ${t('copied')}` : `⎘ ${t('copyMaterial')}`),
+              h('button', {
                 type: 'button', className: 'tp-btn tp-btn-secondary', disabled: digest.phase === 'loading',
                 onClick: () => { runDigest(false); },
               }, digest.phase === 'loading' ? t('generating') : `✦ ${t('digest')}`),
@@ -759,6 +940,10 @@ window.__ModuleLoader__.load({
                 onClick: () => { setTab(value); },
               }, t(`tab.${value}`), h('span', { className: 'tp-tab-count' }, String(counts[value] ?? 0)))),
             h('span', { className: 'tp-toolbar-actions' },
+              favIds.size > 0 && h('button', {
+                type: 'button', className: 'tp-btn tp-chip', 'aria-pressed': favOnly,
+                'data-on': favOnly ? 'true' : 'false', onClick: () => { setFavOnly((value) => !value); },
+              }, `★ ${t('favorites')} · ${String(favIds.size)}`),
               unreadCount > 0 && h('button', {
                 type: 'button', className: 'tp-btn tp-chip', 'aria-pressed': unreadOnly,
                 'data-on': unreadOnly ? 'true' : 'false', onClick: () => { setUnreadOnly((value) => !value); },
@@ -799,6 +984,8 @@ window.__ModuleLoader__.load({
             visible.map((item) => h(ItemCard, {
               key: item.id, item, t, now, translations, onTranslate: translate,
               read: readIds.has(item.id), onOpen: markRead,
+              fav: favIds.has(item.id), onFav: toggleFav,
+              fullTexts, onFetchFullText: fetchFullText,
             }))),
           managing && h(Manager, {
             sources: state.sources.length > 0 ? state.sources : [],
@@ -903,6 +1090,18 @@ window.__ModuleLoader__.load({
 .tp-src-dot[data-state="ok"]{background:var(--dsw-alias-state-success-primary,#12805c)}
 .tp-src-dot[data-state="error"]{background:var(--dsw-alias-state-error-primary,#d43d17)}
 .tp-src-dot[data-state="disabled"]{background:var(--dsw-alias-state-idle-primary,#9ca3af)}
+.tp-star{padding:1px 6px;font-size:13px;line-height:1.4;border:none;background:none;color:var(--dsw-alias-label-secondary,#6b7280)}
+.tp-star[data-fav="true"]{color:#e8a33d}
+.tp-star:hover{color:#e8a33d}
+.tp-cluster{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--dsw-alias-state-warn-primary,#b45309);background:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#b45309) 10%,transparent);border-radius:999px;padding:1px 7px;vertical-align:1px}
+.tp-angles{margin-top:8px;border-top:1px dashed var(--dsw-alias-border-l1,rgba(31,35,40,.14));padding-top:8px;display:flex;flex-direction:column;gap:6px}
+.tp-angle{border:1px solid color-mix(in srgb,var(--dsw-alias-brand-primary,#2e6be6) 30%,var(--dsw-alias-border-l1,rgba(31,35,40,.12)));border-radius:var(--dsw-radius-sm,6px);padding:7px 11px;display:flex;flex-direction:column;gap:2px;background:color-mix(in srgb,var(--dsw-alias-brand-primary,#2e6be6) 3%,transparent)}
+.tp-angle-topic{font-size:12.8px;font-weight:650;color:var(--dsw-alias-label-primary,#1f2328)}
+.tp-angle-hook{font-size:11.8px;color:var(--dsw-alias-label-secondary,#6b7280);line-height:1.5}
+.tp-fulltext{margin-top:9px;border:1px solid var(--dsw-alias-border-l1,rgba(31,35,40,.12));border-radius:var(--dsw-radius-sm,6px);background:var(--dsw-alias-bg-layer-2,rgba(31,35,40,.03))}
+.tp-fulltext-body{max-height:320px;overflow-y:auto;padding:12px 14px;font-size:12.8px;line-height:1.75;color:var(--dsw-alias-label-primary,#1f2328);white-space:pre-wrap}
+.tp-quick-routes{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:-2px 0 8px}
+.tp-quick-hint{font-size:10.5px;color:var(--dsw-alias-label-secondary,#6b7280);width:100%}
 .tp-head-actions{margin-left:auto;display:inline-flex;align-items:center;gap:8px;flex:none}
 .tp-translate{padding:1px 7px;font-size:10.5px;font-weight:700;border-radius:999px;line-height:1.5}
 .tp-translate[data-phase="ready"][data-open="true"]{background:color-mix(in srgb,var(--dsw-alias-brand-primary,#2e6be6) 12%,transparent);border-color:var(--dsw-alias-brand-primary,#2e6be6);color:var(--dsw-alias-brand-primary,#2e6be6)}
