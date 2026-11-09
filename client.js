@@ -467,7 +467,6 @@ window.__ModuleLoader__.load({
               h(StarButton, { item, t, fav, onFav }),
               h(FullTextButton, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
               h(AIDigestButton, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
-            h(AIDigestButton, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
               h(TranslateButton, { item, t, translation, onTranslate }),
               time !== '' && h(Meta, null, time))),
           title,
@@ -493,7 +492,6 @@ window.__ModuleLoader__.load({
               h(StarButton, { item, t, fav, onFav }),
               h(FullTextButton, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
               h(AIDigestButton, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
-            h(AIDigestButton, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
               h(TranslateButton, { item, t, translation, onTranslate }),
               time !== '' && h(Meta, null, time))),
           title,
@@ -521,6 +519,9 @@ window.__ModuleLoader__.load({
         title,
         item.summary !== '' && h('p', { className: 'tp-card-sum' }, item.summary),
         translation?.phase === 'error' && h('div', { className: 'tp-inline-error' }, `${t('translateFailed')} · `, h('button', { type: 'button', className: 'tp-btn tp-btn-link', onClick: () => { onTranslate(item); } }, t('translateRetry'))),
+        h(FullTextBlock, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
+        itemDigests[item.id]?.phase === 'error' && h('div', { className: 'tp-inline-error' }, `${t('aiItemFailed')} · `, h('button', { type: 'button', className: 'tp-btn tp-btn-link', onClick: () => { onFetchItemDigest(item); } }, t('aiItemRetry'))),
+        h(AIDigestBlock, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
         h(TranslationBlock, { item, t, translation, onTranslate }));
     }
 

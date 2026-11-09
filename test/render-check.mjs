@@ -48,10 +48,13 @@ const icon = registered.find((row) => row.options.name === 'sidebar.panellist');
 if (panel === undefined || icon === undefined) throw new Error('slots not registered');
 
 // Shallow-render helper: call a component and recursively render function children.
+// Records every component invocation so tests can assert "exactly one X per card".
+const componentCalls = [];
 function render(element, depth = 0) {
   if (element === null || element === undefined || depth > 12) return;
   if (Array.isArray(element)) { for (const child of element) render(child, depth); return; }
   if (typeof element === 'object' && typeof element.type === 'function') {
+    componentCalls.push(element.type.name);
     render(element.type(element.props), depth + 1);
     return;
   }
@@ -89,11 +92,26 @@ const itemDigests = {
 const noop = () => {};
 for (const [index, item] of variants.entries()) {
   const withId = { ...item, id: `x${index}` };
+  componentCalls.length = 0;
   render(C.ItemCard({
     item: withId, t, now, translations, onTranslate: noop,
     read: index % 2 === 0, onOpen: noop, fav: index % 2 === 1, onFav: noop,
     fullTexts, onFetchFullText: noop, itemDigests, onFetchItemDigest: noop,
   }));
+  const kind = item.kind ?? 'article';
+  const count = (name) => componentCalls.filter((n) => n === name).length;
+  const expect = (name, expected) => {
+    if (count(name) !== expected) throw new Error(`variant ${index} (${kind}): ${name} rendered ${count(name)}x, expected ${expected}`);
+  };
+  // Regression guard: each card shows each head button exactly once and has
+  // exactly one display block per feature (a v1.4.0 edit shipped duplicates).
+  expect('StarButton', 1);
+  expect('TranslateButton', 1);
+  expect('AIDigestButton', 1);
+  expect('FullTextButton', kind === 'event' ? 0 : 1);
+  expect('FullTextBlock', 1);
+  expect('AIDigestBlock', 1);
+  expect('TranslationBlock', 1);
 }
 
 // 4) Digest panel with angles + highlights.
