@@ -66,3 +66,6 @@ if (!en || en.needZh !== true) throw new Error('anthropic item missing or needZh
 const zhItem = feed.items.find((row) => row.sourceId === 'deepseek-news');
 if (!zhItem || zhItem.needZh !== false || !zhItem.time) throw new Error('deepseek item missing/wrong flags');
 console.log('[live] OK total=%d', feed.items.length);
+
+// Client render smoke (undefined-identifier / prop-wiring guard).
+await import('./render-check.mjs');

@@ -424,8 +424,10 @@ window.__ModuleLoader__.load({
         return h('article', { className: 'tp-card', 'data-read': read ? 'true' : 'false' },
           h('div', { className: 'tp-card-head' },
             h(SourceAvatar, { label: item.sourceLabel }),
-            h('span', { className: 'tp-source' }, item.sourceLabel),
+            h('span', { className: 'tp-source' }, item.sourceLabel, ' ', h(ClusterChip, { item, t })),
             h('span', { className: 'tp-head-actions' },
+              h(StarButton, { item, t, fav, onFav }),
+              h(FullTextButton, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
               h(TranslateButton, { item, t, translation, onTranslate }),
               time !== '' && h(Meta, null, time))),
           title,
@@ -444,8 +446,10 @@ window.__ModuleLoader__.load({
         return h('article', { className: 'tp-card', 'data-read': read ? 'true' : 'false' },
           h('div', { className: 'tp-card-head' },
             h(SourceAvatar, { label: item.sourceLabel }),
-            h('span', { className: 'tp-source' }, item.sourceLabel),
+            h('span', { className: 'tp-source' }, item.sourceLabel, ' ', h(ClusterChip, { item, t })),
             h('span', { className: 'tp-head-actions' },
+              h(StarButton, { item, t, fav, onFav }),
+              h(FullTextButton, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
               h(TranslateButton, { item, t, translation, onTranslate }),
               time !== '' && h(Meta, null, time))),
           title,
@@ -464,7 +468,7 @@ window.__ModuleLoader__.load({
           h('span', { className: 'tp-source' }, item.sourceLabel, ' ', h(ClusterChip, { item, t })),
           h('span', { className: 'tp-head-actions' },
             h(StarButton, { item, t, fav, onFav }),
-            h(FullTextButton, { item, t, fullText, onFetchFullText }),
+            h(FullTextButton, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
             h(TranslateButton, { item, t, translation, onTranslate }),
             time !== '' && h(Meta, null, time))),
         title,
@@ -1151,6 +1155,14 @@ window.__ModuleLoader__.load({
         label: () => t('panel'),
         locale: NS,
       }, TechPulsePanelIcon));
+    }
+
+    // Test-only component access for test/render-check.mjs; inert in the browser.
+    if (typeof globalThis !== 'undefined' && globalThis.__TP_TEST__ === true) {
+      globalThis.__TP_TEST_COMPONENTS__ = {
+        TechPulsePage, ItemCard, DigestPanel, Manager, Skeletons,
+        StarButton, ClusterChip, TranslateButton, FullTextButton,
+      };
     }
 
     return { inject, apply };
