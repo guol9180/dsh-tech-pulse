@@ -21,6 +21,7 @@ window.__ModuleLoader__.load({
     const TRANSLATE_ROUTE = '/tech-pulse/translate'.slice(1);
     const SUMMARIZE_ROUTE = '/tech-pulse/summarize'.slice(1);
     const ARTICLE_ROUTE = '/tech-pulse/article'.slice(1);
+    const ITEM_DIGEST_ROUTE = '/tech-pulse/digest-item'.slice(1);
 
     const TABS = ['all', 'flash', 'news', 'ai', 'voices'];
     const SOURCE_TYPES = ['rss', 'hackernews', 'github-user', 'html-news', 'github-trending'];
@@ -83,6 +84,12 @@ window.__ModuleLoader__.load({
       'readFullFailed': '全文获取失败',
       'quickRoutes': '中文热榜速查',
       'quickRoutesHint': '点击自动填充，需先启动本机 RSSHub（localhost:1200）',
+      'aiItem': 'AI',
+      'aiItemTitle': '生成这篇的 AI 速览（自动结合全文）',
+      'aiItemFailed': 'AI 速览生成失败',
+      'aiItemRetry': '重试',
+      'openExternal': '在浏览器打开',
+      'collapse': '收起',
       'updatedNow': '刚刚更新',
       'updatedAgo': '更新于 {n}',
       'loadError': '资讯加载失败',
@@ -179,6 +186,12 @@ window.__ModuleLoader__.load({
       'readFullFailed': 'Could not fetch the full article',
       'quickRoutes': 'Chinese hot lists',
       'quickRoutesHint': 'One click fills the feed URL; needs a local RSSHub on localhost:1200',
+      'aiItem': 'AI',
+      'aiItemTitle': 'AI digest for this article (uses the full text)',
+      'aiItemFailed': 'AI digest failed',
+      'aiItemRetry': 'Retry',
+      'openExternal': 'Open in browser',
+      'collapse': 'Collapse',
       'updatedNow': 'Updated just now',
       'updatedAgo': 'Updated {n}',
       'loadError': 'Could not load the feed',
@@ -352,7 +365,29 @@ window.__ModuleLoader__.load({
     function FullTextBlock({ item, t, fullText, onFetch }) {
       if (fullText?.open !== true || fullText?.phase !== 'ready') return null;
       return h('div', { className: 'tp-fulltext' },
-        h('div', { className: 'tp-fulltext-body' }, fullText.text));
+        h('div', { className: 'tp-fulltext-body' }, fullText.text),
+        h('div', { className: 'tp-fulltext-foot' },
+          h('a', { className: 'tp-btn tp-btn-link', href: item.url, target: '_blank', rel: 'noopener noreferrer' }, `↗ ${t('openExternal')}`),
+          h('button', { type: 'button', className: 'tp-btn tp-btn-link', onClick: () => { onFetch(item); } }, t('collapse'))));
+    }
+
+    function AIDigestButton({ item, t, digestItem, onFetch }) {
+      const phase = digestItem?.phase ?? 'idle';
+      return h('button', {
+        type: 'button', className: 'tp-btn tp-translate tp-ai', 'aria-label': t('aiItemTitle'), title: t('aiItemTitle'),
+        'data-phase': phase, 'data-open': (digestItem?.open ?? false) && phase === 'ready' ? 'true' : 'false',
+        onClick: () => { onFetch(item); },
+      }, phase === 'loading' ? h('span', { className: 'tp-spin', 'aria-hidden': true }, '◌') : t('aiItem'));
+    }
+
+    function AIDigestBlock({ item, t, digestItem, onFetch }) {
+      if (digestItem?.open !== true || digestItem?.phase !== 'ready') return null;
+      return h('div', { className: 'tp-aidigest' },
+        h('div', { className: 'tp-aidigest-head' },
+          h('span', { className: 'tp-digest-badge' }, 'AI'),
+          h('span', { className: 'tp-aidigest-oneline' }, digestItem.oneLine)),
+        digestItem.points.length > 0 && h('ul', { className: 'tp-aidigest-points' },
+          digestItem.points.map((point, index) => h('li', { key: index }, point))));
     }
 
     function StarButton({ item, t, fav, onFav }) {
@@ -387,7 +422,7 @@ window.__ModuleLoader__.load({
         translation.summaryZh !== '' && h('p', { className: 'tp-translation-sum' }, translation.summaryZh));
     }
 
-    function ItemCard({ item, t, now, translations, onTranslate, read, onOpen, fav, onFav, fullTexts, onFetchFullText }) {
+    function ItemCard({ item, t, now, translations, onTranslate, read, onOpen, fav, onFav, fullTexts, onFetchFullText, itemDigests, onFetchItemDigest }) {
       const time = relTime(item.time, now, t);
       const translation = translations[item.id];
       const title = h('a', {
@@ -412,10 +447,13 @@ window.__ModuleLoader__.load({
               h('a', { className: 'tp-event-repo', href: item.repoUrl, target: '_blank', rel: 'noopener noreferrer', onClick: () => { onOpen(item); } }, item.repo)),
             h('span', { className: 'tp-head-actions' },
               h(StarButton, { item, t, fav, onFav }),
+              h(AIDigestButton, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
               h(TranslateButton, { item, t, translation, onTranslate }),
               time !== '' && h(Meta, null, time))),
           item.eventTitle !== '' && h('div', { className: 'tp-event-title' }, item.eventTitle),
           h(FullTextBlock, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
+          itemDigests[item.id]?.phase === 'error' && h('div', { className: 'tp-inline-error' }, `${t('aiItemFailed')} · `, h('button', { type: 'button', className: 'tp-btn tp-btn-link', onClick: () => { onFetchItemDigest(item); } }, t('aiItemRetry'))),
+          h(AIDigestBlock, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
           translation?.phase === 'error' && h('div', { className: 'tp-inline-error' }, `${t('translateFailed')} · `, h('button', { type: 'button', className: 'tp-btn tp-btn-link', onClick: () => { onTranslate(item); } }, t('translateRetry'))),
           h(TranslationBlock, { item, t, translation, onTranslate }));
       }
@@ -428,12 +466,16 @@ window.__ModuleLoader__.load({
             h('span', { className: 'tp-head-actions' },
               h(StarButton, { item, t, fav, onFav }),
               h(FullTextButton, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
+              h(AIDigestButton, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
+            h(AIDigestButton, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
               h(TranslateButton, { item, t, translation, onTranslate }),
               time !== '' && h(Meta, null, time))),
           title,
           item.summary !== '' && h('p', { className: 'tp-card-sum' }, item.summary),
           translation?.phase === 'error' && h('div', { className: 'tp-inline-error' }, `${t('translateFailed')} · `, h('button', { type: 'button', className: 'tp-btn tp-btn-link', onClick: () => { onTranslate(item); } }, t('translateRetry'))),
           h(FullTextBlock, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
+          itemDigests[item.id]?.phase === 'error' && h('div', { className: 'tp-inline-error' }, `${t('aiItemFailed')} · `, h('button', { type: 'button', className: 'tp-btn tp-btn-link', onClick: () => { onFetchItemDigest(item); } }, t('aiItemRetry'))),
+          h(AIDigestBlock, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
           h(TranslationBlock, { item, t, translation, onTranslate }),
           h('div', { className: 'tp-meta' },
             h(Meta, null, `▲ ${fmtCount(item.score ?? 0)}`),
@@ -450,12 +492,16 @@ window.__ModuleLoader__.load({
             h('span', { className: 'tp-head-actions' },
               h(StarButton, { item, t, fav, onFav }),
               h(FullTextButton, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
+              h(AIDigestButton, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
+            h(AIDigestButton, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
               h(TranslateButton, { item, t, translation, onTranslate }),
               time !== '' && h(Meta, null, time))),
           title,
           item.summary !== '' && h('p', { className: 'tp-card-sum' }, item.summary),
           translation?.phase === 'error' && h('div', { className: 'tp-inline-error' }, `${t('translateFailed')} · `, h('button', { type: 'button', className: 'tp-btn tp-btn-link', onClick: () => { onTranslate(item); } }, t('translateRetry'))),
           h(FullTextBlock, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
+          itemDigests[item.id]?.phase === 'error' && h('div', { className: 'tp-inline-error' }, `${t('aiItemFailed')} · `, h('button', { type: 'button', className: 'tp-btn tp-btn-link', onClick: () => { onFetchItemDigest(item); } }, t('aiItemRetry'))),
+          h(AIDigestBlock, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
           h(TranslationBlock, { item, t, translation, onTranslate }),
           h('div', { className: 'tp-meta' },
             h(Meta, null, `★ ${fmtCount(item.stars ?? 0)}`),
@@ -469,6 +515,7 @@ window.__ModuleLoader__.load({
           h('span', { className: 'tp-head-actions' },
             h(StarButton, { item, t, fav, onFav }),
             h(FullTextButton, { item, t, fullText: fullTexts[item.id], onFetch: onFetchFullText }),
+            h(AIDigestButton, { item, t, digestItem: itemDigests[item.id], onFetch: onFetchItemDigest }),
             h(TranslateButton, { item, t, translation, onTranslate }),
             time !== '' && h(Meta, null, time))),
         title,
@@ -672,6 +719,8 @@ window.__ModuleLoader__.load({
       const [favOnly, setFavOnly] = useState(false);
       /** itemId -> { phase, open, text } for on-demand full-text reads. */
       const [fullTexts, setFullTexts] = useState({});
+      /** itemId -> { phase, open, oneLine, points } for per-article AI digests. */
+      const [itemDigests, setItemDigests] = useState({});
       const [copyState, setCopyState] = useState({ phase: 'idle', message: '' });
       const alive = useRef(true);
       const loadSeq = useRef(0);
@@ -869,6 +918,36 @@ window.__ModuleLoader__.load({
         });
       }, [state.items, tab, query, highlightsOnly, digest.phase, highlightIds, unreadOnly, readIds, favOnly, favIds]);
 
+      const fetchItemDigest = useCallback(async (item) => {
+        setItemDigests((current) => {
+          const existing = current[item.id];
+          if (existing?.phase === 'ready') {
+            return { ...current, [item.id]: { ...existing, open: !existing.open } };
+          }
+          return { ...current, [item.id]: { phase: 'loading', open: true } };
+        });
+        if (itemDigests[item.id]?.phase === 'ready') return;
+        try {
+          const payload = await apiGet(ITEM_DIGEST_ROUTE, { id: item.id });
+          if (!alive.current) return;
+          const digest = payload.digestItem ?? {};
+          setItemDigests((current) => ({
+            ...current,
+            [item.id]: {
+              phase: 'ready', open: true,
+              oneLine: String(digest.oneLine ?? ''),
+              points: Array.isArray(digest.points) ? digest.points.map((point) => String(point)) : [],
+            },
+          }));
+        } catch (error) {
+          if (!alive.current) return;
+          setItemDigests((current) => ({
+            ...current,
+            [item.id]: { phase: 'error', open: false, message: error instanceof Error ? error.message : String(error) },
+          }));
+        }
+      }, [itemDigests]);
+
       const updatedText = state.updatedAt === 0
         ? ''
         : (now - state.updatedAt < 60000 ? t('updatedNow') : t('updatedAgo', { n: relTime(state.updatedAt, now, t) }));
@@ -990,6 +1069,7 @@ window.__ModuleLoader__.load({
               read: readIds.has(item.id), onOpen: markRead,
               fav: favIds.has(item.id), onFav: toggleFav,
               fullTexts, onFetchFullText: fetchFullText,
+              itemDigests, onFetchItemDigest: fetchItemDigest,
             }))),
           managing && h(Manager, {
             sources: state.sources.length > 0 ? state.sources : [],
@@ -1104,6 +1184,14 @@ window.__ModuleLoader__.load({
 .tp-angle-hook{font-size:11.8px;color:var(--dsw-alias-label-secondary,#6b7280);line-height:1.5}
 .tp-fulltext{margin-top:9px;border:1px solid var(--dsw-alias-border-l1,rgba(31,35,40,.12));border-radius:var(--dsw-radius-sm,6px);background:var(--dsw-alias-bg-layer-2,rgba(31,35,40,.03))}
 .tp-fulltext-body{max-height:320px;overflow-y:auto;padding:12px 14px;font-size:12.8px;line-height:1.75;color:var(--dsw-alias-label-primary,#1f2328);white-space:pre-wrap}
+.tp-fulltext-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 12px;border-top:1px solid var(--dsw-alias-border-l1,rgba(31,35,40,.1))}
+.tp-ai{font-weight:800}
+.tp-ai[data-open="true"]{color:var(--dsw-alias-brand-primary,#2e6be6);border-color:var(--dsw-alias-brand-primary,#2e6be6);background:color-mix(in srgb,var(--dsw-alias-brand-primary,#2e6be6) 10%,transparent)}
+.tp-aidigest{margin-top:9px;border:1px solid color-mix(in srgb,var(--dsw-alias-brand-primary,#2e6be6) 30%,var(--dsw-alias-border-l1,rgba(31,35,40,.12)));border-radius:var(--dsw-radius-md,8px);padding:10px 13px;background:color-mix(in srgb,var(--dsw-alias-brand-primary,#2e6be6) 4%,var(--dsw-alias-bg-layer-1,#fff))}
+.tp-aidigest-head{display:flex;align-items:flex-start;gap:8px}
+.tp-aidigest-oneline{font-size:13.2px;font-weight:650;line-height:1.5;color:var(--dsw-alias-label-primary,#1f2328);padding-top:3px}
+.tp-aidigest-points{margin:7px 0 0;padding-left:18px}
+.tp-aidigest-points li{font-size:12.5px;line-height:1.65;color:var(--dsw-alias-label-secondary,#6b7280);margin-bottom:2px}
 .tp-quick-routes{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:-2px 0 8px}
 .tp-quick-hint{font-size:10.5px;color:var(--dsw-alias-label-secondary,#6b7280);width:100%}
 .tp-head-actions{margin-left:auto;display:inline-flex;align-items:center;gap:8px;flex:none}
@@ -1114,7 +1202,7 @@ window.__ModuleLoader__.load({
 .tp-translation{margin-top:9px;padding:8px 12px;border-left:3px solid var(--dsw-alias-brand-primary,#2e6be6);background:color-mix(in srgb,var(--dsw-alias-brand-primary,#2e6be6) 5%,transparent);border-radius:0 var(--dsw-radius-sm,6px) var(--dsw-radius-sm,6px) 0}
 .tp-translation-title{font-size:13.5px;font-weight:650;line-height:1.5;color:var(--dsw-alias-label-primary,#1f2328)}
 .tp-translation-sum{margin:4px 0 0;font-size:12.5px;line-height:1.6;color:var(--dsw-alias-label-secondary,#6b7280)}
-.tp-digest{max-width:860px;margin:14px auto 0;padding:12px 16px;border:1px solid color-mix(in srgb,var(--dsw-alias-brand-primary,#2e6be6) 35%,var(--dsw-alias-border-l1,rgba(31,35,40,.12)));border-radius:var(--dsw-radius-md,8px);background:color-mix(in srgb,var(--dsw-alias-brand-primary,#2e6be6) 4%,var(--dsw-alias-bg-layer-1,#fff))}
+.tp-digest{max-width:860px;margin:14px auto 0;padding:12px 16px;border:1px solid color-mix(in srgb,var(--dsw-alias-brand-primary,#2e6be6) 35%,var(--dsw-alias-border-l1,rgba(31,35,40,.12)));border-radius:var(--dsw-radius-md,8px);background:color-mix(in srgb,var(--dsw-alias-brand-primary,#2e6be6) 4%,var(--dsw-alias-bg-layer-1,#fff));max-height:46%;overflow-y:auto;flex:none}
 .tp-digest-loading,.tp-digest-error{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .tp-digest-error{border-color:var(--dsw-alias-state-error-primary,#d43d17);background:color-mix(in srgb,var(--dsw-alias-state-error-primary,#d43d17) 5%,var(--dsw-alias-bg-layer-1,#fff))}
 .tp-digest-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
@@ -1162,6 +1250,7 @@ window.__ModuleLoader__.load({
       globalThis.__TP_TEST_COMPONENTS__ = {
         TechPulsePage, ItemCard, DigestPanel, Manager, Skeletons,
         StarButton, ClusterChip, TranslateButton, FullTextButton,
+        FullTextBlock, AIDigestButton, AIDigestBlock,
       };
     }
 

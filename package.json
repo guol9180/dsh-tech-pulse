@@ -1,6 +1,6 @@
 {
   "name": "dsh-tech-pulse",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "Tech pulse — a DeepSeek Harness sidebar panel aggregating first-hand tech updates: Hacker News, publisher RSS, AI-lab announcements (OpenAI / Anthropic / DeepSeek / MSR), and GitHub activity from tech leaders, with an AI digest and on-demand Chinese translation.",
   "type": "module",
   "keywords": [

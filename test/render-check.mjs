@@ -82,10 +82,18 @@ const variants = [
 ];
 const translations = { x1: { phase: 'ready', open: true, titleZh: '中文标题', summaryZh: '中文摘要' } };
 const fullTexts = { x1: { phase: 'ready', open: true, text: '正文' } };
+const itemDigests = {
+  x1: { phase: 'ready', open: true, oneLine: '一句话总结', points: ['要点一', '要点二'] },
+  x2: { phase: 'error', open: false, message: 'boom' },
+};
 const noop = () => {};
 for (const [index, item] of variants.entries()) {
   const withId = { ...item, id: `x${index}` };
-  render(C.ItemCard({ item: withId, t, now, translations, onTranslate: noop, read: index % 2 === 0, onOpen: noop, fav: index % 2 === 1, onFav: noop, fullTexts, onFetchFullText: noop }));
+  render(C.ItemCard({
+    item: withId, t, now, translations, onTranslate: noop,
+    read: index % 2 === 0, onOpen: noop, fav: index % 2 === 1, onFav: noop,
+    fullTexts, onFetchFullText: noop, itemDigests, onFetchItemDigest: noop,
+  }));
 }
 
 // 4) Digest panel with angles + highlights.
@@ -99,6 +107,11 @@ render(C.DigestPanel({
   t, now, items: [baseItem],
   onClose: noop, onRegenerate: noop, highlightsOnly: false, onToggleHighlights: noop,
 }));
+
+// 4b) Per-article AI digest pieces standalone.
+render(C.AIDigestButton({ item: baseItem, t, digestItem: itemDigests.x1, onFetch: noop }));
+render(C.AIDigestBlock({ item: baseItem, t, digestItem: itemDigests.x1, onFetch: noop }));
+render(C.FullTextBlock({ item: baseItem, t, fullText: fullTexts.x1, onFetch: noop }));
 
 // 5) Manager with sources of every type and health state.
 render(C.Manager({
